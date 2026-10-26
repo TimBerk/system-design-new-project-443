@@ -1,0 +1,118 @@
+specification {
+  color c4Person #08427B
+  color c4Container #438DD5
+  color c4Component #85BBF0
+
+  element passenger {
+    title 'Пассажир'
+    style {
+      shape person
+      color c4Person
+    }
+  }
+
+  element gateway {
+    title 'Балансировщик'
+    technology 'nginx'
+    style {
+      shape rectangle
+      color c4Container
+      icon tech:nginx
+    }
+  }
+
+  element application {
+    title 'Приложение такси'
+    technology 'Node.js + TypeScript'
+    style {
+      shape rectangle
+      color c4Container
+      icon tech:nodejs
+    }
+  }
+
+  element database {
+    title 'PostgreSQL'
+    technology 'PostgreSQL'
+    style {
+      shape cylinder
+      color c4Container
+      icon tech:postgresql
+    }
+  }
+
+  element handler {
+    title 'HTTP-обработчик истории'
+    technology 'TypeScript'
+    style {
+      shape component
+      color c4Component
+      icon tech:typescript
+    }
+  }
+
+  element dataccess {
+    title 'Модуль доступа к данным'
+    technology 'pg'
+    style {
+      shape component
+      color c4Component
+      icon tech:typescript
+    }
+  }
+}
+
+model {
+  passenger = passenger 'Пассажир'
+
+  nginx = gateway 'nginx :8080' {
+    description 'Балансировщик стенда.'
+  }
+
+  app1 = application 'app — экземпляр 1' {
+    technology 'Node.js, 0,5 CPU, 512 МБ'
+  }
+
+  app2 = application 'app2 — экземпляр 2' {
+    technology 'Node.js, 0,5 CPU, 512 МБ'
+  }
+
+  db = database 'PostgreSQL' {
+    description 'Таблица trips, 2 000 000 поездок.'
+  }
+
+  handler = handler 'HTTP-обработчик истории' {
+    technology 'GET /passengers/{id}/trips'
+  }
+
+  data_adapter = dataccess 'Модуль доступа к данным' {
+    technology 'query(sql, [id]) — пул pg'
+  }
+
+  passenger -> nginx 'HTTPS'
+  nginx -> app1 'запрос уходит одному из двух'
+  nginx -> app2 'запрос уходит одному из двух'
+  app1 -> db 'SQL'
+  app2 -> db 'SQL'
+  handler -> data_adapter 'вызов функции запроса'
+}
+
+views {
+  view environment {
+    title 'Окружение: пассажир → балансировщик → два экземпляра приложения → PostgreSQL'
+    include passenger, nginx, app1, app2, db
+  }
+
+  dynamic view components {
+    title 'Путь запроса истории: от HTTP-запроса до ответа'
+    passenger -> nginx 'GET /passengers/1/trips'
+    nginx -> handler 'одному из двух экземпляров'
+    handler -> data_adapter 'passengerTrips → query(sql, [id])'
+    data_adapter -> db 'SELECT … WHERE passenger_id = $1 ORDER BY created_at DESC LIMIT 20'
+    db -> data_adapter '20 строк по индексу'
+    data_adapter -> handler 'массив поездок'
+    handler -> nginx 'JSON 200'
+    nginx -> passenger 'JSON 200'
+    include passenger, nginx, handler, data_adapter, db
+  }
+}
